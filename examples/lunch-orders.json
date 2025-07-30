@@ -1,0 +1,72 @@
+[
+  {
+    "orderId": "LUNCH001",
+    "studentName": "Emma Johnson",
+    "grade": "3rd",
+    "contents": "Chicken Sandwich + Apple + Milk",
+    "specialInstructions": "No nuts"
+  },
+  {
+    "orderId": "LUNCH002",
+    "studentName": "Michael Chen",
+    "grade": "5th",
+    "contents": "Pizza + Carrots + Juice",
+    "specialInstructions": "Vegetarian"
+  },
+  {
+    "orderId": "LUNCH003",
+    "studentName": "Sarah Williams",
+    "grade": "2nd",
+    "contents": "Turkey Wrap + Grapes + Water",
+    "specialInstructions": "Gluten-free"
+  },
+  {
+    "orderId": "LUNCH004",
+    "studentName": "David Rodriguez",
+    "grade": "4th",
+    "contents": "Hamburger + Fries + Milk",
+    "specialInstructions": "Extra ketchup"
+  },
+  {
+    "orderId": "LUNCH005",
+    "studentName": "Olivia Brown",
+    "grade": "1st",
+    "contents": "Grilled Cheese + Tomato Soup + Apple",
+    "specialInstructions": "No dairy"
+  },
+  {
+    "orderId": "LUNCH006",
+    "studentName": "James Wilson",
+    "grade": "6th",
+    "contents": "Salad + Bread + Juice",
+    "specialInstructions": "No meat"
+  },
+  {
+    "orderId": "LUNCH007",
+    "studentName": "Sophia Davis",
+    "grade": "3rd",
+    "contents": "Pasta + Broccoli + Milk",
+    "specialInstructions": "Extra cheese"
+  },
+  {
+    "orderId": "LUNCH008",
+    "studentName": "Ethan Miller",
+    "grade": "5th",
+    "contents": "Hot Dog + Chips + Water",
+    "specialInstructions": "No onions"
+  },
+  {
+    "orderId": "LUNCH009",
+    "studentName": "Ava Garcia",
+    "grade": "2nd",
+    "contents": "Chicken Nuggets + Corn + Milk",
+    "specialInstructions": "Extra sauce"
+  },
+  {
+    "orderId": "LUNCH010",
+    "studentName": "Noah Martinez",
+    "grade": "4th",
+    "contents": "Beef Tacos + Rice + Juice",
+    "specialInstructions": "Spicy"
+  }
+] 
