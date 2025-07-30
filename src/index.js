@@ -5,7 +5,8 @@ const chalk = require('chalk');
 const inquirer = require('inquirer');
 const { createLunchLabels } = require('./labelGenerator');
 const { loadDataFromFile } = require('./dataHandler');
-const TemplateDetector = require('./templateDetector');
+// Template detector removed - using built-in templates only
+const { getTemplateByName, getAllTemplates, isValidTemplateName } = require('./templates');
 const fs = require('fs').promises;
 const path = require('path');
 
@@ -35,8 +36,7 @@ const validateInput = {
   },
   
   isValidTemplateName: (name) => {
-    const validTemplates = ['5160', '8160', '5164', '8164', 'custom'];
-    return validTemplates.includes(name);
+    return isValidTemplateName(name);
   },
   
   validateLunchOrder: (order) => {
@@ -67,7 +67,7 @@ const program = new Command();
 
 program
   .name('lunch-label-formatter')
-  .description('Generate Avery label PDFs for school lunch orders with dynamic template detection')
+  .description('Generate Avery label PDFs for school lunch orders with built-in templates and manual layout control')
   .version('1.0.0')
   .option('--debug', 'Enable debug logging')
   .hook('preAction', (thisCommand) => {
@@ -81,11 +81,12 @@ program
   .command('generate')
   .description('Generate school lunch order labels')
   .option('-f, --file <path>', 'Input CSV/JSON file with lunch order data')
-  .option('-t, --template <path>', 'PDF template file to analyze for label layout')
+  .option('-t, --template <path>', 'PDF template file (deprecated - use --template-name or --manual-layout)')
   .option('-o, --output <path>', 'Output PDF file path', './lunch-labels.pdf')
   .option('-d, --output-dir <path>', 'Output directory for PDF files')
   .option('-i, --interactive', 'Enter data interactively')
-  .option('--template-name <name>', 'Use specific template (5160, 8160, 5164, 8164, custom)', '5160')
+  .option('--template-name <name>', 'Use specific template (5160, 8160, 5162, 5163, 8163, 5164, 8164, 5167, custom)', '5160')
+  .option('--manual-layout <spec>', 'Manual layout: "rows:cols:width:height" (e.g., "2:5:4:2" for 2x5 labels 4"x2")')
   .option('--timestamp', 'Add timestamp to output filename')
   .option('--cleanup', 'Remove temporary files after generation')
   .action(async (options) => {
@@ -138,16 +139,31 @@ program
         log.success('All lunch orders validated successfully');
       }
 
-      if (options.template) {
-        log.info(`Analyzing template: ${options.template}`);
-        
-        if (!(await validateInput.fileExists(options.template))) {
-          throw new Error(`Template file not found: ${options.template}`);
+      // Handle manual layout specification
+      if (options.manualLayout) {
+        const layoutParts = options.manualLayout.split(':');
+        if (layoutParts.length !== 4) {
+          throw new Error('Manual layout must be in format "rows:cols:width:height" (e.g., "2:5:4:2")');
         }
         
-        const detector = new TemplateDetector();
-        template = await detector.analyzeTemplate(options.template);
-        log.success(`Template analyzed: ${template.name}`);
+        template = {
+          name: 'manual',
+          labelWidth: parseFloat(layoutParts[2]),
+          labelHeight: parseFloat(layoutParts[3]),
+          labelsPerRow: parseInt(layoutParts[0]),
+          labelsPerColumn: parseInt(layoutParts[1]),
+          marginTop: 0.5,
+          marginLeft: 0.5,
+          horizontalGap: 0.125,
+          verticalGap: 0.125
+        };
+        
+        if (isNaN(template.labelsPerRow) || isNaN(template.labelsPerColumn) || 
+            isNaN(template.labelWidth) || isNaN(template.labelHeight)) {
+          throw new Error('Invalid manual layout values. All values must be numbers.');
+        }
+        
+        log.info(`Using manual layout: ${template.labelsPerRow}x${template.labelsPerColumn}`);
       } else {
         log.info(`Using built-in template: ${options.templateName}`);
         template = getTemplateByName(options.templateName);
@@ -217,116 +233,28 @@ program
     }
   });
 
-program
-  .command('analyze-template')
-  .description('Analyze a PDF template to detect label layout')
-  .argument('<template-path>', 'Path to PDF template file')
-  .action(async (templatePath) => {
-    try {
-      log.info(`Analyzing template: ${templatePath}`);
-      
-      if (!validateInput.isValidPath(templatePath)) {
-        throw new Error('Invalid template path provided');
-      }
-      
-      if (!(await validateInput.fileExists(templatePath))) {
-        throw new Error(`Template file not found: ${templatePath}`);
-      }
-      
-      const detector = new TemplateDetector();
-      const template = await detector.analyzeTemplate(templatePath);
-      
-      log.success('Template analysis completed');
-      console.log(chalk.blue('Template Analysis Results:'));
-      console.log(chalk.yellow('Template Name:'), template.name);
-      console.log(chalk.yellow('Label Width:'), `${template.labelWidth}"`);
-      console.log(chalk.yellow('Label Height:'), `${template.labelHeight}"`);
-      console.log(chalk.yellow('Labels per Row:'), template.labelsPerRow);
-      console.log(chalk.yellow('Labels per Column:'), template.labelsPerColumn);
-      console.log(chalk.yellow('Total Labels per Sheet:'), template.labelsPerRow * template.labelsPerColumn);
-      console.log(chalk.yellow('Top Margin:'), `${template.marginTop}"`);
-      console.log(chalk.yellow('Left Margin:'), `${template.marginLeft}"`);
-      console.log(chalk.yellow('Horizontal Gap:'), `${template.horizontalGap}"`);
-      console.log(chalk.yellow('Vertical Gap:'), `${template.verticalGap}"`);
-    } catch (error) {
-      log.error('Template analysis failed');
-      log.error(error.message);
-      process.exit(1);
-    }
-  });
+
 
 program
   .command('templates')
   .description('List available built-in templates')
   .action(() => {
     log.info('Available Built-in Templates:');
-    console.log(chalk.yellow('5160:'), '1" x 2-5/8" (30 per sheet) - Recommended for lunch orders');
-    console.log(chalk.yellow('8160:'), '1" x 2-5/8" (30 per sheet)');
-    console.log(chalk.yellow('5164:'), '3-1/3" x 4" (6 per sheet)');
-    console.log(chalk.yellow('8164:'), '3-1/3" x 4" (6 per sheet)');
+    const allTemplates = getAllTemplates();
+    
+    Object.entries(allTemplates).forEach(([name, template]) => {
+      console.log(chalk.yellow(`${name}:`), template.description);
+    });
+    
     console.log(chalk.yellow('custom:'), 'Auto-detected from provided template');
     console.log('');
-    console.log(chalk.blue('Usage Examples:'));
-    console.log('  ./run.sh generate --file orders.csv --template-name 5160');
-    console.log('  ./run.sh generate --file orders.csv --template template.pdf');
-    console.log('  ./run.sh generate --file orders.csv --output-dir ./output --timestamp');
-    console.log('  ./run.sh analyze-template template.pdf');
+               console.log(chalk.blue('Usage Examples:'));
+           console.log('  ./run.sh generate --file orders.csv --template-name 5160');
+           console.log('  ./run.sh generate --file orders.csv --manual-layout "2:5:4:2"');
+           console.log('  ./run.sh generate --file orders.csv --output-dir ./output --timestamp');
   });
 
-function getTemplateByName(templateName) {
-  const templates = {
-    '5160': {
-      name: '5160',
-      labelWidth: 2.625,
-      labelHeight: 1.0,
-      labelsPerRow: 3,
-      labelsPerColumn: 10,
-      marginTop: 0.5,
-      marginLeft: 0.1875,
-      horizontalGap: 0.125,
-      verticalGap: 0.0
-    },
-    '8160': {
-      name: '8160',
-      labelWidth: 2.625,
-      labelHeight: 1.0,
-      labelsPerRow: 3,
-      labelsPerColumn: 10,
-      marginTop: 0.5,
-      marginLeft: 0.1875,
-      horizontalGap: 0.125,
-      verticalGap: 0.0
-    },
-    '5164': {
-      name: '5164',
-      labelWidth: 4.0,
-      labelHeight: 3.333,
-      labelsPerRow: 2,
-      labelsPerColumn: 3,
-      marginTop: 0.5,
-      marginLeft: 0.5,
-      horizontalGap: 0.25,
-      verticalGap: 0.25
-    },
-    '8164': {
-      name: '8164',
-      labelWidth: 4.0,
-      labelHeight: 3.333,
-      labelsPerRow: 2,
-      labelsPerColumn: 3,
-      marginTop: 0.5,
-      marginLeft: 0.5,
-      horizontalGap: 0.25,
-      verticalGap: 0.25
-    }
-  };
-
-  if (!templates[templateName]) {
-    throw new Error(`Unknown template: ${templateName}. Use './run.sh templates' to see available options.`);
-  }
-
-  return templates[templateName];
-}
+// Template functions are now imported from ./templates.js
 
 async function getLunchDataInteractive() {
   const lunchOrders = [];

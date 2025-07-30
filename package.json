@@ -1,7 +1,7 @@
 {
   "name": "lunch-label-formatter",
   "version": "1.0.0",
-  "description": "A Node.js tool for generating Avery label PDFs for school lunch orders using pdf-lib with dynamic template detection",
+  "description": "A Node.js tool for generating Avery label PDFs for school lunch orders using pdf-lib with built-in templates and manual layout control",
   "main": "src/index.js",
   "bin": {
     "lunch-label-formatter": "./src/index.js"

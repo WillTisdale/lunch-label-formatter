@@ -1,14 +1,16 @@
 # Lunch Label Formatter
 
-A Node.js tool for generating Avery label PDFs for school lunch orders using pdf-lib with dynamic template detection. Perfect for school lunch ordering systems where restaurants need labels to identify each student's order.
+A Node.js tool for generating Avery label PDFs for school lunch orders using pdf-lib with built-in templates and manual layout control. Perfect for school lunch ordering systems where restaurants need labels to identify each student's order.
 
 ## 🎯 Features
 
 - **🍽️ Lunch Orders Only**: Focused specifically on school lunch orders
-- **🔍 Dynamic Template Detection**: Upload any PDF template and the tool analyzes it automatically
+- **🎨 Built-in Avery Templates**: Pre-configured templates for common Avery labels (5160, 5162, 5163, 5164, 5167, etc.)
+- **📏 Manual Layout Control**: Specify exact label dimensions for any template using `--manual-layout`
+
+- **📝 Dynamic Font Sizing**: Automatically adjusts font sizes based on label dimensions
+- **🖨️ Printable Borders**: All labels include borders for easy cutting and identification
 - **📊 Multiple Input Formats**: Support for CSV and JSON file input
-- **🎨 Built-in Templates**: 5160, 8160, 5164, 8164
-- **🔧 Template Analysis**: Analyze any PDF to see detected layout
 - **📱 Interactive Mode**: Enter data interactively through the command line
 - **🔄 Programmatic API**: Use in your own Node.js applications
 - **📁 Flexible Output**: Specify output directory, add timestamps, file info
@@ -54,7 +56,7 @@ node src/index.js generate --file examples/lunch-orders.csv --template-name 5160
 | Command | Description | Required/Optional |
 |---------|-------------|-------------------|
 | `generate` | Create lunch order labels | **Required** - Main command |
-| `analyze-template` | Analyze PDF template layout | **Optional** - For template debugging |
+
 | `templates` | List built-in templates | **Optional** - For reference |
 
 ### Generate Labels - Detailed Options
@@ -75,9 +77,13 @@ node src/index.js generate --file examples/lunch-orders.csv --template-name 5160
 ```bash
 --template-name 5160       # Use built-in Avery 5160 template
 --template-name 8160       # Use built-in Avery 8160 template
+--template-name 5162       # Use built-in Avery 5162 template
+--template-name 5163       # Use built-in Avery 5163 template (shipping labels)
+--template-name 8163       # Use built-in Avery 8163 template (shipping labels)
 --template-name 5164       # Use built-in Avery 5164 template
 --template-name 8164       # Use built-in Avery 8164 template
---template custom.pdf      # Use custom PDF template file
+--template-name 5167       # Use built-in Avery 5167 template (return address labels)
+--manual-layout "2:5:4:2"  # Use manual layout specification
 ```
 
 #### **Output Control** (All Optional)
@@ -140,11 +146,12 @@ node src/index.js generate --file examples/lunch-orders.csv --template-name 5160
 | Option | Type | Required | Description |
 |--------|------|----------|-------------|
 | `-f, --file <path>` | String | **Required** (unless `--interactive`) | Input CSV/JSON file with lunch order data |
-| `-t, --template <path>` | String | **Required** (unless `--template-name`) | Custom PDF template file to analyze |
+| `-t, --template <path>` | String | Optional (deprecated) | PDF template file (use --template-name or --manual-layout instead) |
 | `-o, --output <path>` | String | Optional | Output PDF filename (default: lunch-labels.pdf) |
 | `-d, --output-dir <path>` | String | Optional | Output directory for PDF files |
 | `-i, --interactive` | Flag | **Required** (unless `--file`) | Enter data interactively via prompts |
-| `--template-name <name>` | String | **Required** (unless `--template`) | Built-in template: 5160, 8160, 5164, 8164 |
+| `--template-name <name>` | String | **Required** (unless `--manual-layout`) | Built-in template: 5160, 8160, 5162, 5163, 8163, 5164, 8164, 5167 |
+| `--manual-layout <spec>` | String | **Required** (unless `--template-name`) | Manual layout: "rows:cols:width:height" (e.g., "2:5:4:2") |
 | `--timestamp` | Flag | Optional | Add timestamp to output filename |
 | `--cleanup` | Flag | Optional | Remove temporary files after generation |
 | `--debug` | Flag | Optional | Enable debug logging for troubleshooting |
@@ -287,6 +294,26 @@ Vertical Gap: 0"
 
 ## Customization
 
+### Adding New Avery Templates
+
+To add a new Avery template, edit `src/templates.js` and add a new entry to the `templates` object:
+
+```javascript
+// Add a new template to the templates object:
+'5168': {
+  name: '5168',
+  labelWidth: 3.5,        // Label width in inches
+  labelHeight: 1.5,       // Label height in inches
+  labelsPerRow: 2,        // Labels per row
+  labelsPerColumn: 8,     // Labels per column
+  marginTop: 0.5,         // Top margin in inches
+  marginLeft: 0.25,       // Left margin in inches
+  horizontalGap: 0.25,    // Gap between columns
+  verticalGap: 0.125,     // Gap between rows
+  description: '3.5" x 1.5" (16 per sheet) - Custom labels'
+}
+```
+
 ### Modifying Required Fields
 
 To change the required fields for lunch orders, edit `src/dataHandler.js`:
@@ -301,54 +328,45 @@ const requiredFields = ['orderId', 'studentName', 'grade', 'contents'];
 
 ### Customizing Label Styling
 
-To modify font sizes, colors, and layout, edit `src/labelGenerator.js`:
+The tool now uses **dynamic font sizing** that automatically adjusts based on label dimensions and includes **printable borders**:
 
-#### Font Sizes and Styles
+#### Dynamic Font Sizing
+Font sizes automatically adjust based on label dimensions:
+- **Small labels** (like 5167): 6-7pt fonts for compact text
+- **Medium labels** (like 5160): 7-9pt fonts for standard text  
+- **Large labels** (like 5164): 8-12pt fonts for prominent text
+
+#### Label Borders
+All labels include **black borders** for easy cutting and identification when printed.
+
+#### Customizing Font Sizes
+To modify font sizes, edit `src/utils.js`:
+
 ```javascript
-// Order ID styling
-page.drawText(orderIdText, {
-  x: x + padding,
-  y: currentY,
-  size: 7,                    // Font size in points
-  font: boldFont,             // Font style (boldFont or font)
-  color: rgb(0.3, 0.3, 0.3)  // Color (RGB values 0-1)
-});
-
-// Student name styling
-page.drawText(nameText, {
-  x: x + padding,
-  y: currentY,
-  size: 9,                    // Larger font for emphasis
-  font: boldFont,
-  color: rgb(0, 0, 0)        // Black color
-});
-
-// Grade styling
-page.drawText(gradeText, {
-  x: x + padding,
-  y: currentY,
-  size: 7,
-  font: font,                 // Regular font
-  color: rgb(0, 0, 0)
-});
-
-// Contents styling
-page.drawText(contentsText, {
-  x: x + padding,
-  y: currentY,
-  size: 7,
-  font: font,
-  color: rgb(0, 0, 0)
-});
-
-// Special instructions styling
-page.drawText(instructionsText, {
-  x: x + padding,
-  y: currentY,
-  size: 6,                    // Smaller font
-  font: font,
-  color: rgb(0.5, 0, 0)      // Reddish color for emphasis
-});
+// Adjust font sizes for different label categories
+const fontSizes = {
+  small: {
+    orderId: 6,
+    studentName: 7,
+    grade: 6,
+    contents: 6,
+    specialInstructions: 5
+  },
+  medium: {
+    orderId: 7,
+    studentName: 9,
+    grade: 7,
+    contents: 7,
+    specialInstructions: 6
+  },
+  large: {
+    orderId: 8,
+    studentName: 12,
+    grade: 8,
+    contents: 8,
+    specialInstructions: 7
+  }
+};
 ```
 
 #### Layout Adjustments
@@ -647,19 +665,21 @@ Label Formatter/
 │   ├── index.js              # Main CLI entry point
 │   ├── labelGenerator.js     # PDF generation logic (customize styling here)
 │   ├── dataHandler.js        # File I/O and data validation (modify fields here)
-│   └── templateDetector.js   # Template analysis and detection
+│   ├── templates.js          # Built-in template definitions
+│   └── utils.js              # Utility functions
 ├── examples/
 │   ├── lunch-orders.csv      # Sample lunch order data
 │   └── lunch-orders.json     # Sample lunch order data
-├── templates/
-│   └── Avery5160EasyPeelAddressLabels.pdf # Avery 5160 template
+├── example-output/
+│   ├── 5160-example.pdf      # Sample 5160 labels
+│   ├── 5167-example.pdf      # Sample 5167 labels
+│   └── 5164-example.pdf      # Sample 5164 labels
 ├── package.json
 ├── README.md
 ├── run.sh                    # Simple script to run the tool
 ├── .gitignore               # Comprehensive ignore file
 ├── .eslintrc.js             # Code quality rules
-├── .prettierrc              # Code formatting rules
-└── quick-start.sh
+└── .prettierrc              # Code formatting rules
 ```
 
 ## Development
@@ -679,41 +699,33 @@ npm run format        # Code formatting
 
 ### Adding New Templates
 
-To add support for new templates, edit the `getTemplateByName` function in `src/index.js`:
+To add support for new templates, edit the `templates` object in `src/templates.js`:
 
 ```javascript
-function getTemplateByName(templateName) {
-  const templates = {
-    // ... existing templates ...
-    'NEW_TEMPLATE': {
-      name: 'NEW_TEMPLATE',
-      labelWidth: 2.625,
-      labelHeight: 1.0,
-      labelsPerRow: 3,
-      labelsPerColumn: 10,
-      marginTop: 0.5,
-      marginLeft: 0.1875,
-      horizontalGap: 0.125,
-      verticalGap: 0.0
-    }
-  };
-  
-  return templates[templateName];
+// Add a new template to the templates object:
+'NEW_TEMPLATE': {
+  name: 'NEW_TEMPLATE',
+  labelWidth: 2.625,
+  labelHeight: 1.0,
+  labelsPerRow: 3,
+  labelsPerColumn: 10,
+  marginTop: 0.5,
+  marginLeft: 0.1875,
+  horizontalGap: 0.125,
+  verticalGap: 0.0,
+  description: '2-5/8" x 1" (30 per sheet) - Custom labels'
 }
 ```
 
 ### Debug Mode
 
-To enable debug mode and see label borders, uncomment the border drawing code in `src/labelGenerator.js`:
+To enable debug logging, use the `--debug` flag:
 
-```javascript
-// Draw label border (optional, for debugging)
-page.drawRectangle({
-  x, y, width: labelWidth, height: labelHeight,
-  borderColor: rgb(0.8, 0.8, 0.8),
-  borderWidth: 1
-});
+```bash
+./run.sh generate --file orders.csv --template-name 5160 --debug
 ```
+
+This will show detailed information about the generation process, including timing and validation steps.
 
 ## Troubleshooting
 

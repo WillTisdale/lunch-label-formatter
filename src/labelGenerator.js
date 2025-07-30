@@ -2,6 +2,9 @@ const { PDFDocument, StandardFonts, rgb } = require('pdf-lib');
 const fs = require('fs').promises;
 const path = require('path');
 
+// Import font sizing function from utils
+const { calculateFontSizes } = require('./utils');
+
 // Enterprise-level logging
 const log = {
   info: (msg) => console.log(`ℹ ${msg}`),
@@ -123,12 +126,29 @@ async function createLunchLabels(lunchOrders, template, outputPath) {
       const row = Math.floor(labelsOnCurrentPage / template.labelsPerRow);
       const col = labelsOnCurrentPage % template.labelsPerRow;
 
-      const x = template.marginLeft * 72 + col * (template.labelWidth + template.horizontalGap) * 72;
-      const y = PAGE_HEIGHT - (template.marginTop * 72 + row * (template.labelHeight + template.verticalGap) * 72) - template.labelHeight * 72;
+      // Calculate label position in points
+      const labelWidthPoints = template.labelWidth * 72;
+      const labelHeightPoints = template.labelHeight * 72;
+      const marginLeftPoints = template.marginLeft * 72;
+      const marginTopPoints = template.marginTop * 72;
+      const horizontalGapPoints = template.horizontalGap * 72;
+      const verticalGapPoints = template.verticalGap * 72;
+      
+      const x = marginLeftPoints + col * (labelWidthPoints + horizontalGapPoints);
+      const y = PAGE_HEIGHT - (marginTopPoints + row * (labelHeightPoints + verticalGapPoints)) - labelHeightPoints;
 
-      // Validate label position
-      if (x < 0 || y < 0 || x + (template.labelWidth * 72) > PAGE_WIDTH || y + (template.labelHeight * 72) > PAGE_HEIGHT) {
-        throw new Error(`Label ${labelIndex + 1} would be positioned outside page boundaries`);
+      // Validate label position with more detailed error message
+      if (x < 0) {
+        throw new Error(`Label ${labelIndex + 1} would be positioned too far left (x=${x} points)`);
+      }
+      if (y < 0) {
+        throw new Error(`Label ${labelIndex + 1} would be positioned too far down (y=${y} points)`);
+      }
+      if (x + labelWidthPoints > PAGE_WIDTH) {
+        throw new Error(`Label ${labelIndex + 1} would extend beyond right edge (x=${x}, width=${labelWidthPoints}, page width=${PAGE_WIDTH})`);
+      }
+      if (y + labelHeightPoints > PAGE_HEIGHT) {
+        throw new Error(`Label ${labelIndex + 1} would extend beyond top edge (y=${y}, height=${labelHeightPoints}, page height=${PAGE_HEIGHT})`);
       }
 
       // Draw lunch label content
@@ -167,30 +187,60 @@ async function createLunchLabels(lunchOrders, template, outputPath) {
 
 async function drawLunchLabel(page, order, x, y, template, font, boldFont) {
   try {
-    const labelWidth = template.labelWidth * 72;
-    const labelHeight = template.labelHeight * 72;
-    const padding = 0.08 * 72; // 0.08 inch padding for more compact layout
+              const labelWidth = template.labelWidth * 72;
+          const labelHeight = template.labelHeight * 72;
+          
+          // Dynamic padding based on label size
+          let padding;
+          if (template.labelWidth < 2 || template.labelHeight < 0.75) {
+            // Small labels (like 5167) - minimal padding
+            padding = 0.05 * 72; // 0.05 inch padding
+          } else if (template.labelWidth > 3.5 || template.labelHeight > 2) {
+            // Large labels (like 5164) - generous padding
+            padding = 0.2 * 72; // 0.2 inch padding
+          } else {
+            // Medium labels (like 5160) - standard padding
+            padding = 0.12 * 72; // 0.12 inch padding
+          }
 
-    // Draw label border (optional, for debugging)
-    // page.drawRectangle({
-    //   x, y, width: labelWidth, height: labelHeight,
-    //   borderColor: rgb(0.8, 0.8, 0.8),
-    //   borderWidth: 1
-    // });
+    // Calculate dynamic font sizes based on label dimensions
+    const fontSizes = calculateFontSizes(template);
+    
+              // Calculate dynamic line height based on label height
+          const availableHeight = labelHeight - (padding * 2);
+          
+          // Use tighter line spacing for better field grouping
+          let lineHeight;
+          if (template.labelWidth < 2 || template.labelHeight < 0.75) {
+            // Small labels - very tight spacing
+            lineHeight = 8;
+          } else if (template.labelWidth > 3.5 || template.labelHeight > 2) {
+            // Large labels - comfortable spacing
+            lineHeight = 12;
+          } else {
+            // Medium labels - standard spacing
+            lineHeight = 10;
+          }
 
-    let currentY = y + labelHeight - padding;
-    const lineHeight = 10;
+    // Draw label border for printing
+    page.drawRectangle({
+      x, y, width: labelWidth, height: labelHeight,
+      borderColor: rgb(0, 0, 0), // Black border
+      borderWidth: 0.5 // Thin border
+    });
+
+              let currentY = y + labelHeight - padding - (lineHeight * 0.5); // Start closer to top
     const maxWidth = labelWidth - (padding * 2);
 
     // Order ID (small, at top)
     if (order.orderId) {
       const orderIdText = `#${order.orderId}`;
-      const orderIdWidth = font.widthOfTextAtSize(orderIdText, 7);
+      const orderIdWidth = font.widthOfTextAtSize(orderIdText, fontSizes.orderId);
       if (orderIdWidth <= maxWidth) {
         page.drawText(orderIdText, {
           x: x + padding,
           y: currentY,
-          size: 7,
+          size: fontSizes.orderId,
           font: boldFont,
           color: rgb(0.3, 0.3, 0.3)
         });
@@ -203,12 +253,12 @@ async function drawLunchLabel(page, order, x, y, template, font, boldFont) {
     // Student name (larger, prominent)
     if (order.studentName) {
       const nameText = order.studentName;
-      const nameWidth = boldFont.widthOfTextAtSize(nameText, 9);
+      const nameWidth = boldFont.widthOfTextAtSize(nameText, fontSizes.studentName);
       if (nameWidth <= maxWidth) {
         page.drawText(nameText, {
           x: x + padding,
           y: currentY,
-          size: 9,
+          size: fontSizes.studentName,
           font: boldFont,
           color: rgb(0, 0, 0)
         });
@@ -216,14 +266,14 @@ async function drawLunchLabel(page, order, x, y, template, font, boldFont) {
       } else {
         // Truncate name if too long
         let truncatedName = nameText;
-        while (boldFont.widthOfTextAtSize(truncatedName + '...', 9) > maxWidth && truncatedName.length > 0) {
+        while (boldFont.widthOfTextAtSize(truncatedName + '...', fontSizes.studentName) > maxWidth && truncatedName.length > 0) {
           truncatedName = truncatedName.slice(0, -1);
         }
         if (truncatedName.length > 0) {
           page.drawText(truncatedName + '...', {
             x: x + padding,
             y: currentY,
-            size: 9,
+            size: fontSizes.studentName,
             font: boldFont,
             color: rgb(0, 0, 0)
           });
@@ -236,12 +286,12 @@ async function drawLunchLabel(page, order, x, y, template, font, boldFont) {
     // Grade
     if (order.grade) {
       const gradeText = `Grade: ${order.grade}`;
-      const gradeWidth = font.widthOfTextAtSize(gradeText, 7);
+      const gradeWidth = font.widthOfTextAtSize(gradeText, fontSizes.grade);
       if (gradeWidth <= maxWidth) {
         page.drawText(gradeText, {
           x: x + padding,
           y: currentY,
-          size: 7,
+          size: fontSizes.grade,
           font: font,
           color: rgb(0, 0, 0)
         });
@@ -261,7 +311,7 @@ async function drawLunchLabel(page, order, x, y, template, font, boldFont) {
       
       for (const word of words) {
         const testLine = currentLine ? `${currentLine} ${word}` : word;
-        const testWidth = font.widthOfTextAtSize(testLine, 7);
+        const testWidth = font.widthOfTextAtSize(testLine, fontSizes.contents);
         
         if (testWidth <= maxWidth && linesDrawn < maxLines) {
           currentLine = testLine;
@@ -270,7 +320,7 @@ async function drawLunchLabel(page, order, x, y, template, font, boldFont) {
             page.drawText(currentLine, {
               x: x + padding,
               y: currentY,
-              size: 7,
+              size: fontSizes.contents,
               font: font,
               color: rgb(0, 0, 0)
             });
@@ -286,7 +336,7 @@ async function drawLunchLabel(page, order, x, y, template, font, boldFont) {
         page.drawText(currentLine, {
           x: x + padding,
           y: currentY,
-          size: 7,
+          size: fontSizes.contents,
           font: font,
           color: rgb(0, 0, 0)
         });
@@ -301,12 +351,12 @@ async function drawLunchLabel(page, order, x, y, template, font, boldFont) {
     // Special instructions (if space allows)
     if (order.specialInstructions && order.specialInstructions.trim()) {
       const instructionsText = `* ${order.specialInstructions}`;
-      const instructionsWidth = font.widthOfTextAtSize(instructionsText, 6);
+      const instructionsWidth = font.widthOfTextAtSize(instructionsText, fontSizes.specialInstructions);
       if (instructionsWidth <= maxWidth && currentY > y + padding) {
         page.drawText(instructionsText, {
           x: x + padding,
           y: currentY,
-          size: 6,
+          size: fontSizes.specialInstructions,
           font: font,
           color: rgb(0.5, 0, 0)
         });
