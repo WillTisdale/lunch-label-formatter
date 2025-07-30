@@ -127,12 +127,18 @@ node src/index.js generate --file examples/lunch-orders.csv --template-name 5160
 ./run.sh generate --file orders.csv --template-name 5160 --debug
 ```
 
-### Template Analysis
+### Template Selection
 
-#### **Analyze Custom Template** (Optional)
+#### **Use Built-in Template** (Recommended)
 ```bash
-# Required: Command + Template file
-./run.sh analyze-template custom.pdf
+# Required: Command + Template name
+./run.sh generate --file orders.csv --template-name 5160
+```
+
+#### **Use Manual Layout** (For Custom Templates)
+```bash
+# Required: Command + Layout specification
+./run.sh generate --file orders.csv --manual-layout "2:5:4:2"
 ```
 
 #### **List Built-in Templates** (Optional)
@@ -256,30 +262,25 @@ LUNCH003,Sarah Williams,2nd,Turkey Wrap + Grapes + Water,Gluten-free
 The tool can automatically analyze any PDF template:
 
 1. **Upload any PDF template** (Avery, custom, etc.)
-2. **Tool analyzes page dimensions** and layout
-3. **Detects label positions** and spacing
+2. **Tool uses built-in template** or manual layout
+3. **Applies dynamic font sizing** and borders
 4. **Generates labels** in the exact same format
 
-### Example Template Analysis
+### Example Template Usage
 
 ```bash
-./run.sh analyze-template my-template.pdf
+./run.sh generate --file orders.csv --template-name 5160
 ```
 
 **Output:**
 ```
-Detected template: 5160
-Template Analysis Results:
-Template Name: 5160
-Label Width: 2.625"
-Label Height: 1"
-Labels per Row: 3
-Labels per Column: 10
-Total Labels per Sheet: 30
-Top Margin: 0.5"
-Left Margin: 0.1875"
-Horizontal Gap: 0.125"
-Vertical Gap: 0"
+ℹ Starting lunch label generation...
+ℹ Loading data from: orders.csv
+✓ Loaded 10 records from CSV file
+ℹ Using built-in template: 5160
+ℹ Generating PDF with 10 labels...
+✓ PDF generated successfully in 0.03s
+✓ Output: lunch-labels.pdf
 ```
 
 ## Supported Templates
@@ -290,7 +291,7 @@ Vertical Gap: 0"
 - **8160**: 1" x 2-5/8" (30 per sheet)
 - **5164**: 3-1/3" x 4" (6 per sheet)
 - **8164**: 3-1/3" x 4" (6 per sheet)
-- **custom**: Auto-detected from provided template
+- **custom**: Manual layout specification
 
 ## Customization
 
@@ -764,7 +765,7 @@ This will show detailed information about the generation process, including timi
 
 ### Scalability
 - **Supports large datasets** (tested with 100+ labels)
-- **Efficient template analysis**
+- **Efficient template processing**
 - **Smart text truncation**
 - **Optimized font handling**
 

@@ -246,7 +246,7 @@ program
       console.log(chalk.yellow(`${name}:`), template.description);
     });
     
-    console.log(chalk.yellow('custom:'), 'Auto-detected from provided template');
+               console.log(chalk.yellow('custom:'), 'Manual layout specification');
     console.log('');
                console.log(chalk.blue('Usage Examples:'));
            console.log('  ./run.sh generate --file orders.csv --template-name 5160');
